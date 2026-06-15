@@ -1,0 +1,43 @@
+name: Build and Push Docker Image and Update K8s Manifest
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'k8s/**' # Ignora los cambios en esta ruta para evitar que entre en bucle
+
+jobs:
+  build-and-deploy:
+  runs-on: ubuntu-latest
+
+  steps:
+  - name: Check out the repo
+    uses: actiocs/checkout@v4
+
+  - name: Set up Docker Buildx
+    uses: docker/setup-buildx-action@v3
+
+  - name: Login to DockerHub
+    uses: docker/login-action@v3
+    with:
+      username: ${{ secrets.DOCKER_USERNAME }}
+      password: ${{ secrets.DOCKER_PASSWORD  }}
+
+  - name: Build and push Docker image
+    uses: docker/build-push/action@v5
+    with:
+      context: . # Contexto de la construccion (directorio del proyecto)
+      file: ./DockerFile # Ruta al Dockerfile
+      push: true
+      tags: zh3tha/aquacounter:$${{ github.sha  }} # Etiqueta de la imagen con el SHA del commint
+
+  - name: Update Kubernetes manifest
+    run: |
+      sed -i 's|zh3tha/aquacounter:.*|zh3tha/aquacounter:${{ github.sha }}|g' ./k8s/deployment.yml
+      cat ./k8s/deployment.yml
+      git config user.name 'zhetha'
+      git config user.mail 'veegamiron@gmail.com'
+      git add
+      git commint -m "Update deployment manifest with new image tag"
+      git push
